@@ -1,0 +1,22 @@
+{
+  "project": "BasedowApp",
+  "platform": "ios",
+  "github": {
+    "owner": "GKal3",
+    "repo": "BasedowApp"
+  },
+  "provider": "github",
+  "codemagic": {},
+  "bitrise": {},
+  "ios": {
+    "path": "ios",
+    "bundleId": "com.example.flutterApplication1"
+  },
+  "flutter": {
+    "version": "3.47.6",
+    "watch": {}
+  },
+  "reactNative": {},
+  "kmp": {},
+  "mobai": {}
+}
