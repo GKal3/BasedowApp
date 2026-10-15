@@ -50,4 +50,22 @@ class Patient {
       evaluations: evaluations ?? this.evaluations,
     );
   }
+
+  factory Patient.fromMap(Map<String, dynamic> m) {
+    final evals = ((m['evaluations'] as List?) ?? const [])
+        .map((e) => Evaluation.fromMap(e as Map<String, dynamic>))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    final birth = m['data_nascita'] as String?;
+
+    return Patient(
+      id: m['id'] as String,
+      nome: m['nome'] as String,
+      cognome: m['cognome'] as String,
+      dataNascita: birth == null ? null : DateTime.parse(birth),
+      note: (m['note'] as String?) ?? '',
+      evaluations: evals,
+    );
+  }
 }

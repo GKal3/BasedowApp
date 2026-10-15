@@ -1,3 +1,5 @@
+/* GESTIONE DELLE AZIONI DI LOGIN - SIGN IN*/
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/auth_repository.dart';
@@ -7,8 +9,9 @@ import '../../models/app_user.dart';
 /// Stato = utente loggato (null se non loggato). Il router reagisce ai cambi
 /// di questo stato e fa i redirect da solo.
 class AuthController extends Notifier<AppUser?> {
+  
   @override
-  AppUser? build() => null;
+  AppUser? build() => ref.read(authRepositoryProvider).currentUser;
 
   /// Ritorna un messaggio d'errore, oppure null se è andato tutto bene.
   Future<String?> signIn(String email, String password) async {

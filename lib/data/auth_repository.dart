@@ -13,6 +13,9 @@ class AuthException implements Exception {
 /// quando sceglierai il backend basterà scriverne un'altra (es. Supabase)
 /// senza toccare le schermate.
 abstract class AuthRepository {
+  // Utente della sessione salvata, null se non c'è.
+  AppUser? get currentUser;
+  
   Future<AppUser> signIn({required String email, required String password});
 
   Future<AppUser> signUp({
@@ -34,6 +37,9 @@ class _Account {
 /// SOLO PER SVILUPPO UI: gli utenti vivono in RAM e le password non sono
 /// protette. Va sostituita con un'autenticazione vera.
 class InMemoryAuthRepository implements AuthRepository {
+  @override
+  AppUser? get currentUser => null;
+  
   final List<_Account> _accounts = [
     // Account demo per provare l'app senza registrarsi. Da rimuovere.
     _Account(

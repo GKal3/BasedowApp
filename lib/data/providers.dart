@@ -2,12 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_repository.dart';
 import 'patient_repository.dart';
+import 'supabase_auth_repository.dart';
+import 'supabase_patient_repository.dart';
 
-// Per passare a un backend vero basta cambiare le due implementazioni qui sotto.
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => InMemoryAuthRepository(),
+  (ref) => SupabaseAuthRepository(),
 );
 
 final patientRepositoryProvider = Provider<PatientRepository>(
-  (ref) => InMemoryPatientRepository(),
+  (ref) => SupabasePatientRepository(),
 );

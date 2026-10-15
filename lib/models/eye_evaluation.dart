@@ -56,6 +56,26 @@ class EyeEvaluation {
       mrd1 != null &&
       mrd2 != null;
 
+  Map<String, dynamic> toMap() => {
+        'iperemiaCongiuntivale': iperemiaCongiuntivale,
+        'chemosiCongiuntivale': chemosiCongiuntivale,
+        'edemaCaruncola': edemaCaruncola,
+        'iperemiaPalpebrale': iperemiaPalpebrale,
+        'edemaPalpebrale': edemaPalpebrale,
+        'mrd1': mrd1,
+        'mrd2': mrd2,
+      };
+
+  factory EyeEvaluation.fromMap(Map<String, dynamic> m) => EyeEvaluation(
+        iperemiaCongiuntivale: m['iperemiaCongiuntivale'] as int?,
+        chemosiCongiuntivale: m['chemosiCongiuntivale'] as int?,
+        edemaCaruncola: m['edemaCaruncola'] as bool?,
+        iperemiaPalpebrale: m['iperemiaPalpebrale'] as int?,
+        edemaPalpebrale: m['edemaPalpebrale'] as int?,
+        mrd1: (m['mrd1'] as num?)?.toDouble(),
+        mrd2: (m['mrd2'] as num?)?.toDouble(),
+      );
+
   int? grade(GradeField f) => switch (f) {
         GradeField.iperemiaCongiuntivale => iperemiaCongiuntivale,
         GradeField.chemosiCongiuntivale => chemosiCongiuntivale,

@@ -1,3 +1,5 @@
+/* CONFIGURAZIONE DEI COLORI - PALETTE DELL'APP */
+
 import 'package:flutter/material.dart';
 
 /// Palette presa dalle variabili CSS del prototipo HTML.
