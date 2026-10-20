@@ -10,6 +10,8 @@ import '../../shared/widgets/wizard_scaffold.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import 'evaluation_controller.dart';
+import '../../data/providers.dart';
+import '../../models/eye_boxes.dart';
 
 /// Passo 1: scatto della foto del volto con sagoma guida.
 class CameraScreen extends ConsumerStatefulWidget {
@@ -29,6 +31,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   bool _starting = true;
   bool _capturing = false;
   String? _error;
+  String? _notice; // messaggio non bloccante, es. "Volto non rilevato"
 
   @override
   void initState() {
@@ -122,13 +125,28 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     await _startCamera();
   }
 
-  Future<void> _capture() async {
+    Future<void> _capture() async {
     final c = _controller;
     if (c == null || !c.value.isInitialized || _capturing) return;
-    setState(() => _capturing = true);
+    setState(() {
+      _capturing = true;
+      _notice = null;
+    });
     try {
       final file = await c.takePicture();
-      ref.read(evaluationDraftProvider.notifier).setPhoto(file.path);
+
+      // ML Kit esiste solo su Android/iOS: su Chrome salto il rilevamento.
+      EyeBoxes? boxes;
+      if (!kIsWeb) {
+        boxes = await ref.read(eyeDetectorProvider).detect(file.path);
+        if (!mounted) return;
+        if (boxes == null) {
+          setState(() => _notice = 'Volto non rilevato. Riprova inquadrando bene il viso.');
+          return;
+        }
+      }
+
+      ref.read(evaluationDraftProvider.notifier).setPhoto(file.path, boxes);
       await _goToEyes();
     } catch (_) {
       if (!mounted) return;
@@ -177,7 +195,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     right: 16,
                     child: Center(
                       child: _StatusPill(
-                        text: _error ?? (ready ? 'Inquadra il viso' : 'Avvio fotocamera…'),
+                        text: _error ?? _notice ?? (ready ? 'Inquadra il viso' : 'Avvio fotocamera…'),
                         ok: false,
                       ),
                     ),

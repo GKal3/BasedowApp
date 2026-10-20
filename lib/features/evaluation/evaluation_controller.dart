@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/evaluation.dart';
 import '../../models/eye_evaluation.dart';
 import '../../shared/formatters.dart';
+import '../../models/eye_boxes.dart';
 
-/// Bozza della valutazione in corso: vive per tutta la durata del wizard
-/// (foto → occhi → sintomi → riepilogo) e viene azzerata a ogni nuova valutazione.
 class EvaluationDraft {
   const EvaluationDraft({
     this.photoPath,
+    this.eyeBoxes,
     this.od = const EyeEvaluation(),
     this.os = const EyeEvaluation(),
     this.doloreRetrobulbare,
@@ -17,6 +17,7 @@ class EvaluationDraft {
 
   /// null = nessuna foto; '' = "continua senza foto" (solo debug).
   final String? photoPath;
+  final EyeBoxes? eyeBoxes;
   final EyeEvaluation od;
   final EyeEvaluation os;
   final bool? doloreRetrobulbare;
@@ -28,14 +29,14 @@ class EvaluationDraft {
       doloreRetrobulbare != null && doloreMovimentiOculari != null;
 
   EvaluationDraft copyWith({
-    String? photoPath,
     EyeEvaluation? od,
     EyeEvaluation? os,
     bool? doloreRetrobulbare,
     bool? doloreMovimentiOculari,
   }) {
     return EvaluationDraft(
-      photoPath: photoPath ?? this.photoPath,
+      photoPath: photoPath,
+      eyeBoxes: eyeBoxes,
       od: od ?? this.od,
       os: os ?? this.os,
       doloreRetrobulbare: doloreRetrobulbare ?? this.doloreRetrobulbare,
@@ -48,6 +49,7 @@ class EvaluationDraft {
         id: 'e_${newId()}',
         date: DateTime.now(),
         photoPath: photoPath,
+        eyeBoxes: eyeBoxes,
         od: od,
         os: os,
         doloreRetrobulbare: doloreRetrobulbare,
@@ -61,7 +63,17 @@ class EvaluationDraftController extends Notifier<EvaluationDraft> {
 
   void reset() => state = const EvaluationDraft();
 
-  void setPhoto(String path) => state = state.copyWith(photoPath: path);
+    /// Una nuova foto sostituisce anche i box della precedente.
+  void setPhoto(String path, [EyeBoxes? boxes]) {
+    state = EvaluationDraft(
+      photoPath: path,
+      eyeBoxes: boxes,
+      od: state.od,
+      os: state.os,
+      doloreRetrobulbare: state.doloreRetrobulbare,
+      doloreMovimentiOculari: state.doloreMovimentiOculari,
+    );
+  }
 
   void _setEye(Eye e, EyeEvaluation value) {
     state = e == Eye.od ? state.copyWith(od: value) : state.copyWith(os: value);

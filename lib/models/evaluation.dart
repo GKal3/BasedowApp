@@ -1,4 +1,5 @@
 import 'eye_evaluation.dart';
+import 'eye_boxes.dart';
 
 /// Valutazione salvata di un paziente.
 class Evaluation {
@@ -8,6 +9,7 @@ class Evaluation {
     required this.od,
     required this.os,
     this.photoPath,
+    this.eyeBoxes,
     this.doloreRetrobulbare,
     this.doloreMovimentiOculari,
   });
@@ -17,6 +19,7 @@ class Evaluation {
 
   /// Percorso locale della foto. Con un backend diventerà il path nello storage.
   final String? photoPath;
+  final EyeBoxes? eyeBoxes;
   final EyeEvaluation od;
   final EyeEvaluation os;
   final bool? doloreRetrobulbare;
