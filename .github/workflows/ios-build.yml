@@ -324,7 +324,47 @@ jobs:
         if: steps.detect.outputs.type == 'flutter'
         env:
           ENV_FILE: ${{ secrets.ENV_FILE }}
-        run: printf '%s\n' "$ENV_FILE" > .env
+          SUPABASE_URL_SECRET: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY_SECRET: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          printf '%s\n' "$ENV_FILE" > .env
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import secrets
+
+          keys = ("SUPABASE_URL", "SUPABASE_ANON_KEY")
+          values = {}
+          values.update({key: os.environ[key] for key in keys if os.environ.get(key)})
+
+          for line in Path(".env").read_text().splitlines():
+              line = line.strip()
+              if not line or line.startswith("#"):
+                  continue
+              if line.startswith("export "):
+                  line = line[len("export "):]
+              name, separator, value = line.partition("=")
+              if separator and name.strip() in keys:
+                  value = value.strip()
+                  if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                      value = value[1:-1]
+                  values[name.strip()] = value
+
+          for key, secret_name in (
+              ("SUPABASE_URL", "SUPABASE_URL_SECRET"),
+              ("SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY_SECRET"),
+          ):
+              if os.environ.get(secret_name):
+                  values[key] = os.environ[secret_name]
+
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              for key in keys:
+                  value = values.get(key, "")
+                  if "\n" in value or "\r" in value:
+                      raise ValueError(f"{key} must be a single-line value")
+                  delimiter = f"BUILDER_{key}_{secrets.token_hex(8)}"
+                  output.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
+          PY
       # setup-node cannot make `with:` keys conditional, so the version and the
       # version file are both computed here; it ignores an empty version file.
       - name: Resolve JS toolchain
@@ -1080,16 +1120,24 @@ jobs:
           if [ "$PROJECT_TYPE" = "flutter" ]; then
             cd "$GITHUB_WORKSPACE"
             apply_build_number
+            DART_DEFINE_ARGS=()
+            for key in SUPABASE_URL SUPABASE_ANON_KEY; do
+              value="${!key:-}"
+              if [ -z "$value" ]; then
+                fail "$key is missing. Set it in the ENV_FILE secret or as a GitHub Actions secret named $key."
+              fi
+              DART_DEFINE_ARGS+=(--dart-define="$key=$value")
+            done
             FLUTTER_VERSION_FLAGS=""
             if [ -n "$build_number" ]; then
               FLUTTER_VERSION_FLAGS="--build-number=$build_number${build_name:+ --build-name=$build_name}"
             fi
             if [ "$CONFIGURATION" = "Debug" ]; then
               echo "Building Flutter iOS Debug..."
-              flutter build ios --debug --no-codesign $FLUTTER_VERSION_FLAGS
+              flutter build ios --debug --no-codesign $FLUTTER_VERSION_FLAGS "${DART_DEFINE_ARGS[@]}"
             else
               echo "Building Flutter iOS Release..."
-              flutter build ios --release --no-codesign $FLUTTER_VERSION_FLAGS
+              flutter build ios --release --no-codesign $FLUTTER_VERSION_FLAGS "${DART_DEFINE_ARGS[@]}"
             fi
             cd "$IOS_PATH"
 
