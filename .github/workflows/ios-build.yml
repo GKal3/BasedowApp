@@ -320,6 +320,11 @@ jobs:
         if: steps.detect.outputs.type == 'flutter'
         run: flutter pub get
 
+      - name: Create .env
+        if: steps.detect.outputs.type == 'flutter'
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        run: printf '%s\n' "$ENV_FILE" > .env
       # setup-node cannot make `with:` keys conditional, so the version and the
       # version file are both computed here; it ignores an empty version file.
       - name: Resolve JS toolchain
