@@ -10,7 +10,8 @@
   "bitrise": {},
   "ios": {
     "path": "ios",
-    "bundleId": "com.example.flutterApplication1"
+    "bundleId": "com.example.flutterApplication1",
+    "configuration": "Release"
   },
   "flutter": {
     "version": "3.47.6",
