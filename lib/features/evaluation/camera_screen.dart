@@ -1,17 +1,20 @@
+import 'dart:io' show Platform;
+
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/providers.dart';
+import '../../models/eye_boxes.dart';
 import '../../models/eye_evaluation.dart';
 import '../../router/app_routes.dart';
 import '../../shared/widgets/wizard_scaffold.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import 'evaluation_controller.dart';
-import '../../data/providers.dart';
-import '../../models/eye_boxes.dart';
+import 'live_face_guide.dart';
 
 /// Passo 1: scatto della foto del volto con sagoma guida.
 class CameraScreen extends ConsumerStatefulWidget {
@@ -33,10 +36,20 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   String? _error;
   String? _notice; // messaggio non bloccante, es. "Volto non rilevato"
 
+  // Guida in tempo reale (solo Android/iOS: ML Kit non esiste sul web).
+  final _guide = ValueNotifier<GuideResult>(LiveFaceGuide.idle);
+  LiveFaceGuide? _tracker;
+  bool _streaming = false;
+
+  /// true = lo scatto resta bloccato finché il viso non è allineato.
+  /// Lascialo false finché non hai tarato la guida sul tuo telefono.
+  static const _requireAlignment = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (!kIsWeb) _tracker = LiveFaceGuide();
     _setup();
   }
 
@@ -44,6 +57,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
+    _tracker?.dispose();
+    _guide.dispose();
     super.dispose();
   }
 
@@ -91,6 +106,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       _cameras[_cameraIndex],
       ResolutionPreset.high,
       enableAudio: false,
+      // Formato richiesto da ML Kit per analizzare il flusso.
+      imageFormatGroup: kIsWeb
+          ? null
+          : (Platform.isAndroid
+              ? ImageFormatGroup.nv21
+              : ImageFormatGroup.bgra8888),
     );
     try {
       await controller.initialize();
@@ -102,6 +123,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         _controller = controller;
         _starting = false;
       });
+      _startTracking(controller);
     } catch (_) {
       await controller.dispose();
       if (!mounted) return;
@@ -114,9 +136,42 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   Future<void> _releaseController() async {
     final c = _controller;
+    await _stopTracking(c);
     _controller = null;
-    if (mounted) setState(() {});
+    if (mounted) {
+      _guide.value = LiveFaceGuide.idle;
+      setState(() {});
+    }
     await c?.dispose();
+  }
+
+  /// Avvia l'analisi dei fotogrammi: aggiorna solo `_guide`, senza
+  /// ridisegnare tutta la schermata.
+  Future<void> _startTracking(CameraController c) async {
+    final tracker = _tracker;
+    if (tracker == null || _streaming || !c.value.isInitialized) return;
+    _streaming = true;
+    final camera = _cameras[_cameraIndex];
+    try {
+      await c.startImageStream((image) async {
+        final result = await tracker.analyze(
+          image,
+          camera,
+          c.value.deviceOrientation,
+        );
+        if (result != null && mounted) _guide.value = result;
+      });
+    } catch (_) {
+      _streaming = false; // la guida non parte, ma si può scattare lo stesso
+    }
+  }
+
+  Future<void> _stopTracking(CameraController? c) async {
+    if (!_streaming) return;
+    _streaming = false;
+    try {
+      if (c != null && c.value.isStreamingImages) await c.stopImageStream();
+    } catch (_) {}
   }
 
   Future<void> _switchCamera() async {
@@ -125,7 +180,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     await _startCamera();
   }
 
-    Future<void> _capture() async {
+  Future<void> _capture() async {
     final c = _controller;
     if (c == null || !c.value.isInitialized || _capturing) return;
     setState(() {
@@ -133,6 +188,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       _notice = null;
     });
     try {
+      // Fermo l'analisi in tempo reale prima dello scatto.
+      await _stopTracking(c);
       final file = await c.takePicture();
 
       // ML Kit esiste solo su Android/iOS: su Chrome salto il rilevamento.
@@ -141,7 +198,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         boxes = await ref.read(eyeDetectorProvider).detect(file.path);
         if (!mounted) return;
         if (boxes == null) {
-          setState(() => _notice = 'Volto non rilevato. Riprova inquadrando bene il viso.');
+          setState(() => _notice =
+              'Volto non rilevato. Riprova inquadrando bene il viso.');
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted && _notice != null) setState(() => _notice = null);
+          });
+          _startTracking(c);
           return;
         }
       }
@@ -187,16 +249,23 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   const _GuideShade(),
                   const _ThirdsGrid(),
                   // Sagoma ovale: diventa gialla quando il viso è allineato.
-                  // TODO: collegare google_mlkit_face_detection e passare true.
-                  const _FaceMask(aligned: false),
+                  ValueListenableBuilder<GuideResult>(
+                    valueListenable: _guide,
+                    builder: (_, g, _) => _FaceMask(aligned: g.aligned),
+                  ),
                   Positioned(
                     top: 16,
                     left: 16,
                     right: 16,
                     child: Center(
-                      child: _StatusPill(
-                        text: _error ?? _notice ?? (ready ? 'Inquadra il viso' : 'Avvio fotocamera…'),
-                        ok: false,
+                      child: ValueListenableBuilder<GuideResult>(
+                        valueListenable: _guide,
+                        builder: (_, g, _) => _StatusPill(
+                          text: _error ??
+                              _notice ??
+                              (ready ? g.message : 'Avvio fotocamera…'),
+                          ok: _error == null && _notice == null && g.aligned,
+                        ),
                       ),
                     ),
                   ),
@@ -227,9 +296,16 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     children: [
                       const SizedBox(width: 46),
                       const SizedBox(width: 28),
-                      _ShutterButton(
-                        enabled: ready && !_capturing,
-                        onTap: _capture,
+                      ValueListenableBuilder<GuideResult>(
+                        valueListenable: _guide,
+                        builder: (_, g, _) => _ShutterButton(
+                          enabled: ready &&
+                              !_capturing &&
+                              (!_requireAlignment ||
+                                  g.aligned ||
+                                  _tracker == null),
+                          onTap: _capture,
+                        ),
                       ),
                       const SizedBox(width: 28),
                       _SwitchCameraButton(onTap: _switchCamera),
