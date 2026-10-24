@@ -55,6 +55,11 @@ class LiveFaceGuide {
   /// (evita lo sfarfallio).
   static const _framesNeeded = 3;
 
+  /// true = accanto al messaggio compaiono i valori misurati
+  /// (r = altezza volto/ovale, x e y = centro del volto). Utile per tarare
+  /// le soglie qui sopra. Mettilo a false quando hai finito.
+  static const debugInfo = true;
+
   /// Analizzo al massimo un fotogramma ogni tanto: basta e risparmia batteria.
   static const _minInterval = Duration(milliseconds: 120);
 
@@ -90,11 +95,14 @@ class LiveFaceGuide {
 
       final faces = await _detector.processImage(input);
 
-      // ML Kit restituisce le coordinate sull'immagine già raddrizzata:
-      // con rotazione di 90°/270° larghezza e altezza si scambiano.
+      // Dimensioni dell'immagine "in piedi" su cui ML Kit dà le coordinate.
+      // Con rotazione di 90°/270° larghezza e altezza si scambiano SOLO se il
+      // fotogramma arriva in orizzontale (Android). Su iPhone arriva già in
+      // verticale: scambiare le misure falsava tutti i calcoli.
       final quarterTurn = rotation == InputImageRotation.rotation90deg ||
           rotation == InputImageRotation.rotation270deg;
-      final upright = quarterTurn
+      final swap = quarterTurn && image.width > image.height;
+      final upright = swap
           ? Size(image.height.toDouble(), image.width.toDouble())
           : Size(image.width.toDouble(), image.height.toDouble());
 
@@ -133,6 +141,9 @@ class LiveFaceGuide {
     final cy = mapY(r.center.dy / upright.height);
     final faceH = (r.height / upright.height) * (cropY ? 1 / vis : 1);
     final ratio = faceH / _ovalHeight;
+    final dbg = debugInfo
+        ? ' [r ${ratio.toStringAsFixed(2)}  x ${cx.toStringAsFixed(2)}  y ${cy.toStringAsFixed(2)}]'
+        : '';
 
     String? problem;
     if (ratio < _minFaceRatio) {
@@ -150,14 +161,14 @@ class LiveFaceGuide {
 
     if (problem != null) {
       _okFrames = 0;
-      return (message: problem, aligned: false);
+      return (message: '$problem$dbg', aligned: false);
     }
 
     _okFrames++;
     if (_okFrames < _framesNeeded) {
-      return (message: 'Tieni fermo…', aligned: false);
+      return (message: 'Tieni fermo…$dbg', aligned: false);
     }
-    return (message: 'Perfetto, scatta ora', aligned: true);
+    return (message: 'Perfetto, scatta ora$dbg', aligned: true);
   }
 
   /// Rotazione da dichiarare a ML Kit (procedura ufficiale del plugin).
