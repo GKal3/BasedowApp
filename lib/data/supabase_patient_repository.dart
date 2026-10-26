@@ -12,11 +12,51 @@ class SupabasePatientRepository implements PatientRepository {
 
   @override
   Future<List<Patient>> list(String ownerId) async {
-    final rows = await _c
+    final data = await _c
         .from('patients')
         .select('*, evaluations(*)')
         .eq('owner_id', ownerId)
         .order('created_at', ascending: false);
+
+    // Copie modificabili delle righe.
+    final rows = data
+        .map<Map<String, dynamic>>((r) => {
+              ...r,
+              'evaluations': ((r['evaluations'] as List?) ?? const [])
+                  .map((e) => Map<String, dynamic>.from(e as Map))
+                  .toList(),
+            })
+        .toList();
+
+    // Percorsi del bucket (non locali, non già URL).
+    final paths = <String>{};
+    for (final r in rows) {
+      for (final e in r['evaluations'] as List) {
+        final p = (e as Map)['photo_path'] as String?;
+        if (p != null && p.isNotEmpty && !p.startsWith('/') && !p.startsWith('http')) {
+          paths.add(p);
+        }
+      }
+    }
+
+    // URL firmati validi 6 ore, uno per foto, in parallelo.
+    final urls = <String, String>{};
+    await Future.wait(paths.map((p) async {
+      try {
+        urls[p] = await _c.storage.from('photos').createSignedUrl(p, 6 * 3600);
+      } catch (_) {
+        // File mancante o errore: la foto resta con il segnaposto.
+      }
+    }));
+
+    for (final r in rows) {
+      for (final e in r['evaluations'] as List) {
+        final m = e as Map<String, dynamic>;
+        final p = m['photo_path'] as String?;
+        if (p != null && urls.containsKey(p)) m['photo_path'] = urls[p];
+      }
+    }
+
     return rows.map<Patient>(Patient.fromMap).toList();
   }
 

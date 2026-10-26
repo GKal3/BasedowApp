@@ -45,13 +45,15 @@ class AppPhoto extends StatelessWidget {
     Widget onError(BuildContext context, Object error, StackTrace? stack) =>
         _placeholder();
 
-    if (kIsWeb) {
+    final isUrl = p.startsWith('http') || p.startsWith('blob:');
+    if (kIsWeb || isUrl) {
       return Image.network(
         p,
         width: width,
         height: height,
         fit: fit,
         alignment: alignment,
+        cacheWidth: kIsWeb ? null : cacheWidth,
         errorBuilder: onError,
       );
     }
