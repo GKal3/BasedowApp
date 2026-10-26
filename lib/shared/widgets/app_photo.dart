@@ -15,6 +15,7 @@ class AppPhoto extends StatelessWidget {
     this.alignment = Alignment.center,
     this.width,
     this.height,
+    this.cacheWidth = 1200,
   });
 
   final String? path;
@@ -22,6 +23,11 @@ class AppPhoto extends StatelessWidget {
   final Alignment alignment;
   final double? width;
   final double? height;
+
+  /// Larghezza massima (in pixel) a cui decodificare l'immagine, per
+  /// risparmiare memoria. Per gli ingrandimenti degli occhi serve un valore
+  /// alto, altrimenti vengono sgranati.
+  final int? cacheWidth;
 
   Widget _placeholder() => Container(
         width: width,
@@ -36,7 +42,8 @@ class AppPhoto extends StatelessWidget {
     final p = path;
     if (p == null || p.isEmpty) return _placeholder();
 
-    Widget errorBuilder(BuildContext _, Object _, StackTrace? _) => _placeholder();
+    Widget onError(BuildContext context, Object error, StackTrace? stack) =>
+        _placeholder();
 
     if (kIsWeb) {
       return Image.network(
@@ -45,7 +52,7 @@ class AppPhoto extends StatelessWidget {
         height: height,
         fit: fit,
         alignment: alignment,
-        errorBuilder: errorBuilder,
+        errorBuilder: onError,
       );
     }
     return Image.file(
@@ -54,8 +61,8 @@ class AppPhoto extends StatelessWidget {
       height: height,
       fit: fit,
       alignment: alignment,
-      cacheWidth: 1200,
-      errorBuilder: errorBuilder,
+      cacheWidth: cacheWidth,
+      errorBuilder: onError,
     );
   }
 }

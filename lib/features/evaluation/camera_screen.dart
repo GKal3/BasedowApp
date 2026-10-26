@@ -45,6 +45,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   /// Lascialo false finché non hai tarato la guida sul tuo telefono.
   static const _requireAlignment = false;
 
+  /// La foto scattata con la fotocamera FRONTALE è a specchio (come il selfie)?
+  /// Con la posteriore la foto è sempre "vera". Se con la frontale nella
+  /// schermata "occhio destro" vedi l'occhio sbagliato, cambia true/false.
+  static const _frontPhotoIsMirrored = true;
+
   @override
   void initState() {
     super.initState();
@@ -195,7 +200,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       // ML Kit esiste solo su Android/iOS: su Chrome salto il rilevamento.
       EyeBoxes? boxes;
       if (!kIsWeb) {
-        boxes = await ref.read(eyeDetectorProvider).detect(file.path);
+        final camera = _cameras[_cameraIndex];
+        final mirrored = camera.lensDirection == CameraLensDirection.front &&
+            _frontPhotoIsMirrored;
+        boxes = await ref
+            .read(eyeDetectorProvider)
+            .detect(file.path, mirrored: mirrored);
         if (!mounted) return;
         if (boxes == null) {
           setState(() => _notice =

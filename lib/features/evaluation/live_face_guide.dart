@@ -40,8 +40,8 @@ class LiveFaceGuide {
 
   /// Altezza del volto rispetto all'ovale: sotto il minimo "Avvicinati",
   /// sopra il massimo "Allontanati".
-  static const _minFaceRatio = 0.55;
-  static const _maxFaceRatio = 0.95;
+  static const _minFaceRatio = 0.72;
+  static const _maxFaceRatio = 0.88;
 
   /// Scostamento massimo del centro del volto dal centro dell'ovale
   /// (frazione della larghezza / dell'altezza del riquadro).

@@ -85,7 +85,7 @@ class _EyeAssessmentScreenState extends ConsumerState<EyeAssessmentScreen> {
         children: [
           // Foto fissa in alto: scorrono solo i parametri.
           // Con la tastiera aperta la nascondo per lasciare spazio ai campi MRD.
-          if (!keyboardOpen) PhotoFixedHeader(path: draft.photoPath, eye: eye),
+          if (!keyboardOpen) PhotoFixedHeader(path: draft.photoPath, eye: eye, boxes: draft.eyeBoxes),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),

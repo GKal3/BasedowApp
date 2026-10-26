@@ -7,8 +7,12 @@ import 'package:image/image.dart' as img;
 import '../../models/eye_boxes.dart';
 
 abstract class EyeDetector {
-  /// Null se non c'è esattamente un volto o gli occhi non sono rilevati.
-  Future<EyeBoxes?> detect(String photoPath);
+  /// Rileva gli occhi sulla foto scattata. Null se non c'è esattamente un
+  /// volto o gli occhi non sono rilevati.
+  ///
+  /// [mirrored] = true se la foto è a specchio (come in un selfie): in quel
+  /// caso l'occhio destro del paziente (OD) sta a DESTRA nell'immagine.
+  Future<EyeBoxes?> detect(String photoPath, {bool mirrored = false});
   void dispose();
 }
 
@@ -22,7 +26,7 @@ class MlKitEyeDetector implements EyeDetector {
   );
 
   @override
-  Future<EyeBoxes?> detect(String photoPath) async {
+  Future<EyeBoxes?> detect(String photoPath, {bool mirrored = false}) async {
     // 1. Applica l'orientamento EXIF ai pixel e sovrascrive il file, così
     //    foto, rilevatore e visualizzazione usano lo stesso spazio.
     final bytes = await File(photoPath).readAsBytes();
@@ -42,16 +46,20 @@ class MlKitEyeDetector implements EyeDetector {
     final b = face.contours[FaceContourType.rightEye]?.points;
     if (a == null || b == null || a.isEmpty || b.isEmpty) return null;
 
-    // 3. OD/OS dalla posizione: in una foto non specchiata scattata al
-    //    paziente, il suo occhio destro (OD) sta a SINISTRA nell'immagine.
+    // 3. OD/OS dalla posizione nell'immagine.
+    //    Foto "vera" (fotocamera posteriore): l'occhio destro del paziente
+    //    sta a SINISTRA nell'immagine. Foto a specchio: è il contrario.
     final aCx = a.map((p) => p.x).reduce((x, y) => x + y) / a.length;
     final bCx = b.map((p) => p.x).reduce((x, y) => x + y) / b.length;
     final leftInImage = aCx < bCx ? a : b;
     final rightInImage = aCx < bCx ? b : a;
 
+    final odPoints = mirrored ? rightInImage : leftInImage;
+    final osPoints = mirrored ? leftInImage : rightInImage;
+
     return EyeBoxes(
-      od: _box(leftInImage, w, h),
-      os: _box(rightInImage, w, h),
+      od: _box(odPoints, w, h),
+      os: _box(osPoints, w, h),
       imageWidth: w,
       imageHeight: h,
     );
@@ -66,8 +74,13 @@ class MlKitEyeDetector implements EyeDetector {
     final maxY = pts.map((p) => p.y).reduce(max).toDouble();
 
     final cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-    final bw = (maxX - minX) * 1.6; // margine attorno all'occhio
-    final bh = bw / 2;
+    var bw = (maxX - minX) * 1.6; // margine attorno all'occhio
+    if (bw > w) bw = w.toDouble();
+    var bh = bw / 2;
+    if (bh > h) {
+      bh = h.toDouble();
+      bw = bh * 2;
+    }
 
     final left = (cx - bw / 2).clamp(0, w - bw).toDouble();
     final top = (cy - bh / 2).clamp(0, h - bh).toDouble();
