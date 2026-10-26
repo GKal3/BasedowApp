@@ -3,6 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../models/evaluation.dart';
 import '../models/patient.dart';
 import 'patient_repository.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 class SupabasePatientRepository implements PatientRepository {
   sb.SupabaseClient get _c => sb.Supabase.instance.client;
@@ -31,6 +34,19 @@ class SupabasePatientRepository implements PatientRepository {
 
   @override
   Future<void> delete(String ownerId, String patientId) async {
+    final storage = _c.storage.from('photos');
+    final folder = '$ownerId/$patientId';
+
+    // 1. Elenca e cancella i file del paziente (foto e json).
+    final files = await storage.list(
+      path: folder,
+      searchOptions: const sb.SearchOptions(limit: 1000),
+    );
+    if (files.isNotEmpty) {
+      await storage.remove(files.map((f) => '$folder/${f.name}').toList());
+    }
+
+    // 2. Cancella il paziente; le valutazioni vanno via con on delete cascade.
     await _c.from('patients').delete().eq('id', patientId);
   }
 
@@ -40,8 +56,45 @@ class SupabasePatientRepository implements PatientRepository {
     String patientId,
     Evaluation e,
   ) async {
+    final base = '$ownerId/$patientId/${e.id}';
+    final storage = _c.storage.from('photos');
+
+    // 1. Foto
+    String? photoStoragePath;
+    final local = e.photoPath;
+    if (local != null && local.isNotEmpty) {
+      photoStoragePath = '$base.jpg';
+      await storage.upload(
+        photoStoragePath,
+        File(local),
+        fileOptions: const sb.FileOptions(
+          contentType: 'image/jpeg',
+          upsert: true,
+        ),
+      );
+    }
+
+    // 2. File JSON con i bounding box
+    String? boxesStoragePath;
+    final boxes = e.eyeBoxes;
+    if (boxes != null) {
+      boxesStoragePath = '$base.json';
+      final bytes = Uint8List.fromList(utf8.encode(jsonEncode(boxes.toMap())));
+      await storage.uploadBinary(
+        boxesStoragePath,
+        bytes,
+        fileOptions: const sb.FileOptions(
+          contentType: 'application/json',
+          upsert: true,
+        ),
+      );
+    }
+
+    // 3. Riga nel database: path nel bucket, non quelli locali
     await _c.from('evaluations').insert({
-      ...e.toMap(),
+      ...e.toMap(), // include eye_boxes (jsonb) se hai aggiornato Evaluation
+      'photo_path': photoStoragePath,
+      'eye_boxes_path': boxesStoragePath,
       'patient_id': patientId,
     });
   }

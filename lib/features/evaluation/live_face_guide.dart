@@ -40,8 +40,8 @@ class LiveFaceGuide {
 
   /// Altezza del volto rispetto all'ovale: sotto il minimo "Avvicinati",
   /// sopra il massimo "Allontanati".
-  static const _minFaceRatio = 0.72;
-  static const _maxFaceRatio = 0.88;
+  static const _minFaceRatio = 0.84;
+  static const _maxFaceRatio = 1.00;
 
   /// Scostamento massimo del centro del volto dal centro dell'ovale
   /// (frazione della larghezza / dell'altezza del riquadro).
@@ -58,7 +58,7 @@ class LiveFaceGuide {
   /// true = accanto al messaggio compaiono i valori misurati
   /// (r = altezza volto/ovale, x e y = centro del volto). Utile per tarare
   /// le soglie qui sopra. Mettilo a false quando hai finito.
-  static const debugInfo = true;
+  static const debugInfo = false;
 
   /// Analizzo al massimo un fotogramma ogni tanto: basta e risparmia batteria.
   static const _minInterval = Duration(milliseconds: 120);
