@@ -138,4 +138,19 @@ class SupabasePatientRepository implements PatientRepository {
       'patient_id': patientId,
     });
   }
+
+  @override
+  Future<void> deleteEvaluation(
+    String ownerId,
+    String patientId,
+    String evaluationId,
+  ) async {
+    final base = '$ownerId/$patientId/$evaluationId';
+    try {
+      await _c.storage.from('photos').remove(['$base.jpg', '$base.json']);
+    } catch (_) {
+      // File assenti (valutazioni vecchie): si procede comunque.
+    }
+    await _c.from('evaluations').delete().eq('id', evaluationId);
+  }
 }

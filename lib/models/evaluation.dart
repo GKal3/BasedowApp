@@ -27,6 +27,9 @@ class Evaluation {
 
   EyeEvaluation eye(Eye e) => e == Eye.od ? od : os;
 
+  bool isOnDay(DateTime day) =>
+    date.year == day.year && date.month == day.month && date.day == day.day;
+
   // Mappa per la tabella `evaluations`. `patient_id` lo aggiunge il repository.
   Map<String, dynamic> toMap() => {
         'id': id,

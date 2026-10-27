@@ -27,15 +27,33 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final draft = ref.read(evaluationDraftProvider);
-    await ref
-        .read(patientsProvider.notifier)
-        .addEvaluation(widget.patientId, draft.toEvaluation());
-    if (!mounted) return;
-    ref.read(savedBannerProvider.notifier).show();
-    // `go` ricostruisce lo stack [dashboard, scheda paziente] e chiude il wizard.
-    context.go(AppRoutes.patient(widget.patientId));
-    ref.read(evaluationDraftProvider.notifier).reset();
+    try {
+      final draft = ref.read(evaluationDraftProvider);
+      final controller = ref.read(patientsProvider.notifier);
+      final evaluation = draft.toEvaluation();
+      final replacingEvaluationId = draft.replacingEvaluationId;
+      if (replacingEvaluationId == null) {
+        await controller.addEvaluation(widget.patientId, evaluation);
+      } else {
+        await controller.replaceEvaluation(
+          widget.patientId,
+          evaluation,
+          replacingEvaluationId,
+        );
+      }
+      if (!mounted) return;
+      ref.read(savedBannerProvider.notifier).show();
+      ref.read(evaluationDraftProvider.notifier).reset();
+      // `go` ricostruisce lo stack [dashboard, scheda paziente] e chiude il wizard.
+      context.go(AppRoutes.patient(widget.patientId));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore durante il salvataggio: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override

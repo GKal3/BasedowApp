@@ -23,7 +23,12 @@ class PatientsController extends AsyncNotifier<List<Patient>> {
   ) async {
     final user = ref.read(authProvider);
     if (user == null) return;
-    await action(ref.read(patientRepositoryProvider), user.id);
+    try {
+      await action(ref.read(patientRepositoryProvider), user.id);
+    } catch (_) {
+      ref.invalidateSelf();
+      rethrow;
+    }
     ref.invalidateSelf();
     await future;
   }
@@ -52,6 +57,20 @@ class PatientsController extends AsyncNotifier<List<Patient>> {
 
   Future<void> addEvaluation(String patientId, Evaluation evaluation) =>
       _run((repo, owner) => repo.addEvaluation(owner, patientId, evaluation));
+
+  Future<void> replaceEvaluation(
+    String patientId,
+    Evaluation evaluation,
+    String existingEvaluationId,
+  ) =>
+      _run((repo, owner) async {
+        await repo.addEvaluation(owner, patientId, evaluation);
+        await repo.deleteEvaluation(
+          owner,
+          patientId,
+          existingEvaluationId,
+        );
+      });
 }
 
 final patientsProvider =

@@ -50,6 +50,37 @@ class PatientDetailScreen extends ConsumerWidget {
     await ctrl.remove(patientId);
   }
 
+  // true se si può procedere con una nuova valutazione.
+  // Se oggi esiste già una valutazione chiede conferma; con "No" ritorna false.
+  Future<bool> _confirmOverwriteToday(
+    BuildContext context,
+    bool hasEvaluationToday,
+  ) async {
+    if (!hasEvaluationToday) return true;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Valutazione già presente'),
+        content: const Text(
+          'Hai già acquisito dati per oggi. '
+          'Vuoi sovrascriverli con una nuova valutazione?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Sì'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final patient = ref.watch(patientProvider(patientId));
@@ -188,8 +219,22 @@ class PatientDetailScreen extends ConsumerWidget {
           BottomAction(
             child: NavyButton(
               label: 'Nuova valutazione',
-              onPressed: () {
-                ref.read(evaluationDraftProvider.notifier).reset();
+              onPressed: () async {
+                final today = DateTime.now();
+                final todayEvaluations = patient.evaluations
+                    .where((evaluation) => evaluation.isOnDay(today));
+                final existingEvaluation =
+                    todayEvaluations.isEmpty ? null : todayEvaluations.first;
+                if (!await _confirmOverwriteToday(
+                  context,
+                  existingEvaluation != null,
+                )) {
+                  return;
+                }
+                if (!context.mounted) return;
+                ref.read(evaluationDraftProvider.notifier).reset(
+                      replacingEvaluationId: existingEvaluation?.id,
+                    );
                 context.push(AppRoutes.camera(patientId));
               },
             ),

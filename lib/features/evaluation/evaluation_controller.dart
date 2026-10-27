@@ -9,6 +9,7 @@ class EvaluationDraft {
   const EvaluationDraft({
     this.photoPath,
     this.eyeBoxes,
+    this.replacingEvaluationId,
     this.od = const EyeEvaluation(),
     this.os = const EyeEvaluation(),
     this.doloreRetrobulbare,
@@ -18,6 +19,7 @@ class EvaluationDraft {
   /// null = nessuna foto; '' = "continua senza foto" (solo debug).
   final String? photoPath;
   final EyeBoxes? eyeBoxes;
+  final String? replacingEvaluationId;
   final EyeEvaluation od;
   final EyeEvaluation os;
   final bool? doloreRetrobulbare;
@@ -37,6 +39,7 @@ class EvaluationDraft {
     return EvaluationDraft(
       photoPath: photoPath,
       eyeBoxes: eyeBoxes,
+      replacingEvaluationId: replacingEvaluationId,
       od: od ?? this.od,
       os: os ?? this.os,
       doloreRetrobulbare: doloreRetrobulbare ?? this.doloreRetrobulbare,
@@ -61,13 +64,16 @@ class EvaluationDraftController extends Notifier<EvaluationDraft> {
   @override
   EvaluationDraft build() => const EvaluationDraft();
 
-  void reset() => state = const EvaluationDraft();
+  void reset({String? replacingEvaluationId}) {
+    state = EvaluationDraft(replacingEvaluationId: replacingEvaluationId);
+  }
 
-    /// Una nuova foto sostituisce anche i box della precedente.
+  /// Una nuova foto sostituisce anche i box della precedente.
   void setPhoto(String path, [EyeBoxes? boxes]) {
     state = EvaluationDraft(
       photoPath: path,
       eyeBoxes: boxes,
+      replacingEvaluationId: state.replacingEvaluationId,
       od: state.od,
       os: state.os,
       doloreRetrobulbare: state.doloreRetrobulbare,
