@@ -58,6 +58,9 @@ class PatientsController extends AsyncNotifier<List<Patient>> {
   Future<void> addEvaluation(String patientId, Evaluation evaluation) =>
       _run((repo, owner) => repo.addEvaluation(owner, patientId, evaluation));
 
+    Future<void> removeEvaluation(String patientId, String evaluationId) =>
+      _run((repo, owner) => repo.deleteEvaluation(owner, patientId, evaluationId));
+
   Future<void> replaceEvaluation(
     String patientId,
     Evaluation evaluation,

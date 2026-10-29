@@ -9,12 +9,20 @@ import '../../../theme/app_theme.dart';
 
 /// Card di una valutazione salvata nella scheda paziente (`.eval-card`).
 class EvalCard extends StatelessWidget {
-  const EvalCard({super.key, required this.evaluation, required this.number});
+  const EvalCard({
+    super.key,
+    required this.evaluation,
+    required this.number,
+    this.onDelete,
+  });
 
   final Evaluation evaluation;
 
   /// Numero progressivo mostrato nel badge ("Valutazione 2").
   final int number;
+
+  /// Se presente, mostra il pulsante di eliminazione.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -45,11 +53,12 @@ class EvalCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                formatDate(e.date),
-                style: AppText.t(13.5, w: FontWeight.w800),
+              Expanded(
+                child: Text(
+                  formatDate(e.date),
+                  style: AppText.t(13.5, w: FontWeight.w800),
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
@@ -62,6 +71,21 @@ class EvalCard extends StatelessWidget {
                   style: AppText.t(11, w: FontWeight.w800),
                 ),
               ),
+              if (onDelete != null) ...[
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: onDelete,
+                  customBorder: const CircleBorder(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(5),
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -124,6 +148,8 @@ class _EyeBlock extends StatelessWidget {
         ('Edema caruncola', formatYesNo(eye.edemaCaruncola)),
         ('Iperemia palp.', formatGrade(eye.iperemiaPalpebrale)),
         ('Edema palp.', formatGrade(eye.edemaPalpebrale)),
+        ('MRD1', formatMm(eye.mrd1)),
+        ('MRD2', formatMm(eye.mrd2)),
         ('Rima', formatMm(eye.rima)),
       ],
     );

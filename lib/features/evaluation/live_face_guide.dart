@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'dart:ui' show Size;
 
 import 'package:camera/camera.dart';
@@ -10,8 +11,13 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 /// `ValueNotifier<GuideResult>` si aggiorna solo quando qualcosa cambia.
 typedef GuideResult = ({String message, bool aligned});
 
-/// Guida in tempo reale: guarda i fotogrammi della fotocamera e dice se il
-/// viso è dentro l'ovale, alla distanza giusta e di fronte.
+/// Guida in tempo reale: verifica che gli occhi cadano nei due rettangoli
+/// della sagoma, che la distanza sia quella prevista e che il viso sia
+/// frontale (nessuna rotazione laterale, inclinazione o su/giù).
+///
+/// Tutte le misure sono relative al riquadro 3:4 dell'anteprima e alla
+/// distanza tra gli occhi, mai in pixel o millimetri: il comportamento è lo
+/// stesso su qualsiasi telefono, risoluzione o proporzione del sensore.
 ///
 /// Serve SOLO alla guida visiva. I box degli occhi da salvare si calcolano
 /// sulla foto scattata (vedi `eye_detector.dart`).
@@ -19,46 +25,84 @@ class LiveFaceGuide {
   LiveFaceGuide()
       : _detector = FaceDetector(
           options: FaceDetectorOptions(
-            performanceMode: FaceDetectorMode.fast,
+            performanceMode: FaceDetectorMode.accurate,
+            enableLandmarks: true,
             minFaceSize: 0.2,
           ),
         );
 
   static const GuideResult idle = (message: 'Inquadra il viso', aligned: false);
 
-  // ---- Parametri di taratura (modificali se la guida è troppo rigida/lasca) ----
+  // ---- Geometria della sagoma ----
+  // Deve coincidere con `_FaceMask` in camera_screen.dart e con l'immagine
+  // assets/images/face_guide_mask.png. Se cambi la sagoma, cambia SOLO qui.
+
+  /// Larghezza della sagoma / larghezza del riquadro.
+  static const maskWidthFactor = 0.78;
+
+  /// Larghezza / altezza dell'immagine della sagoma.
+  static const maskAspect = 319 / 384;
+
+  /// Alignment verticale della sagoma nel riquadro.
+  static const maskAlignY = -0.12;
+
+  /// Centro dei due rettangoli degli occhi DENTRO l'immagine della sagoma,
+  /// in frazione della sua larghezza/altezza (0..1).
+  static const _maskEyeLeftX = 0.275;
+  static const _maskEyeRightX = 0.725;
+  static const _maskEyeY = 0.438;
 
   /// Proporzioni del riquadro della fotocamera (larghezza / altezza).
   static const _boxAspect = 3 / 4;
 
-  /// Posizione verticale del centro dell'ovale, in frazione dell'altezza.
-  static const _ovalCenterY = 0.44;
+  // ---- Valori derivati: dove devono cadere gli occhi nel riquadro ----
+  static const _maskH = maskWidthFactor / maskAspect * _boxAspect;
+  static const _maskTop = (1 - _maskH) * (1 + maskAlignY) / 2;
 
-  /// Altezza dell'ovale in frazione dell'altezza del riquadro
-  /// (larghezza 78% × proporzioni 319:384 dell'immagine della sagoma).
-  static const _ovalHeight = 0.78 * (384 / 319) / (4 / 3);
+  /// Distanza tra i centri degli occhi / larghezza del riquadro (≈ 0.35).
+  static const _targetIod = (_maskEyeRightX - _maskEyeLeftX) * maskWidthFactor;
 
-  /// Altezza del volto rispetto all'ovale: sotto il minimo "Avvicinati",
-  /// sopra il massimo "Allontanati".
-  static const _minFaceRatio = 0.84;
-  static const _maxFaceRatio = 1.00;
+  /// Punto medio degli occhi, in frazione di larghezza e altezza (≈ 0.50, 0.44).
+  static const _targetX =
+      0.5 + ((_maskEyeLeftX + _maskEyeRightX) / 2 - 0.5) * maskWidthFactor;
+  static const _targetY = _maskTop + _maskEyeY * _maskH;
 
-  /// Scostamento massimo del centro del volto dal centro dell'ovale
+  // ---- Tolleranze (da tarare con debugInfo = true) ----
+
+  /// Scarto ammesso sulla distanza, relativo al valore target (±5%).
+  static const _iodTolerance = 0.05;
+
+  /// Scostamento massimo del punto medio degli occhi dal target
   /// (frazione della larghezza / dell'altezza del riquadro).
-  static const _maxOffsetX = 0.10;
-  static const _maxOffsetY = 0.10;
+  static const _maxOffsetX = 0.03;
+  static const _maxOffsetY = 0.025;
 
-  /// Inclinazione massima della testa, in gradi.
-  static const _maxAngle = 15.0;
+  /// Rotazione laterale (yaw), in gradi.
+  static const _maxYaw = 7.0;
 
-  /// Fotogrammi consecutivi "buoni" prima di segnare il viso come allineato
-  /// (evita lo sfarfallio).
-  static const _framesNeeded = 3;
+  /// Spostamento del naso rispetto al centro degli occhi, in unità di
+  /// distanza interoculare. Con il viso frontale è ≈ 0: controllo
+  /// indipendente dall'angolo stimato da ML Kit.
+  static const _maxNoseOffset = 0.07;
 
-  /// true = accanto al messaggio compaiono i valori misurati
-  /// (r = altezza volto/ovale, x e y = centro del volto). Utile per tarare
-  /// le soglie qui sopra. Mettilo a false quando hai finito.
-  static const debugInfo = false;
+  /// Inclinazione laterale della testa (calcolata dalla linea degli occhi).
+  static const _maxRoll = 5.0;
+
+  /// Mento alzato/abbassato (pitch), in gradi.
+  static const _maxPitch = 12.0;
+
+  /// Dopo che il viso è allineato, le tolleranze si allargano di questo
+  /// fattore finché non esce davvero (evita lo sfarfallio al limite).
+  static const _holdFactor = 1.3;
+
+  /// Fotogrammi consecutivi "buoni" prima di segnare il viso come allineato.
+  static const _framesNeeded = 5;
+
+  /// true = accanto al messaggio compaiono i valori misurati:
+  /// d = distanza tra gli occhi (target ≈ 0.35), yaw, n = offset del naso,
+  /// roll, x e y = punto medio degli occhi (target ≈ 0.50 e 0.44).
+  /// Mettilo a false quando hai finito di tarare.
+  static const debugInfo = true;
 
   /// Analizzo al massimo un fotogramma ogni tanto: basta e risparmia batteria.
   static const _minInterval = Duration(milliseconds: 120);
@@ -67,6 +111,7 @@ class LiveFaceGuide {
   bool _busy = false;
   DateTime _last = DateTime.fromMillisecondsSinceEpoch(0);
   int _okFrames = 0;
+  bool _wasAligned = false;
 
   static const _orientations = {
     DeviceOrientation.portraitUp: 0,
@@ -98,7 +143,7 @@ class LiveFaceGuide {
       // Dimensioni dell'immagine "in piedi" su cui ML Kit dà le coordinate.
       // Con rotazione di 90°/270° larghezza e altezza si scambiano SOLO se il
       // fotogramma arriva in orizzontale (Android). Su iPhone arriva già in
-      // verticale: scambiare le misure falsava tutti i calcoli.
+      // verticale.
       final quarterTurn = rotation == InputImageRotation.rotation90deg ||
           rotation == InputImageRotation.rotation270deg;
       final swap = quarterTurn && image.width > image.height;
@@ -114,53 +159,101 @@ class LiveFaceGuide {
     }
   }
 
+  void _reset() {
+    _okFrames = 0;
+    _wasAligned = false;
+  }
+
   GuideResult _evaluate(List<Face> faces, Size upright) {
     if (faces.isEmpty) {
-      _okFrames = 0;
+      _reset();
       return idle;
     }
     if (faces.length > 1) {
-      _okFrames = 0;
+      _reset();
       return (message: 'Un solo volto nell’inquadratura', aligned: false);
     }
 
     final face = faces.first;
-    final r = face.boundingBox;
+    final l = face.landmarks[FaceLandmarkType.leftEye]?.position;
+    final r = face.landmarks[FaceLandmarkType.rightEye]?.position;
+    final nose = face.landmarks[FaceLandmarkType.noseBase]?.position;
+    if (l == null || r == null || nose == null) {
+      _reset();
+      return idle;
+    }
 
-    // L'anteprima riempie il riquadro 3:4 ritagliando (BoxFit.cover):
-    // porto le coordinate dall'immagine al riquadro.
+    // Occhio più a sinistra e più a destra NELL'IMMAGINE: non importa quale
+    // sia il destro del paziente né se il flusso è a specchio.
+    final a = l.x <= r.x ? l : r;
+    final b = l.x <= r.x ? r : l;
+
+    // Parte dell'immagine visibile nel riquadro 3:4 (l'anteprima riempie il
+    // riquadro ritagliando, come BoxFit.cover). Lavoro in pixel
+    // dell'immagine e poi normalizzo sul riquadro.
     final imgAspect = upright.width / upright.height;
     final cropY = imgAspect < _boxAspect; // immagine più stretta: taglia sopra/sotto
     final vis = cropY ? imgAspect / _boxAspect : _boxAspect / imgAspect;
-    double mapX(double n) => cropY ? n : (n - (1 - vis) / 2) / vis;
-    double mapY(double n) => cropY ? (n - (1 - vis) / 2) / vis : n;
+    final boxW = upright.width * (cropY ? 1.0 : vis);
+    final boxH = upright.height * (cropY ? vis : 1.0);
+    final boxLeft = (upright.width - boxW) / 2;
+    final boxTop = (upright.height - boxH) / 2;
 
-    // Il controllo orizzontale è simmetrico rispetto al centro, quindi non
-    // importa se il flusso della camera è a specchio o no.
-    final cx = mapX(r.center.dx / upright.width);
-    final cy = mapY(r.center.dy / upright.height);
-    final faceH = (r.height / upright.height) * (cropY ? 1 / vis : 1);
-    final ratio = faceH / _ovalHeight;
+    final dx = (b.x - a.x).toDouble();
+    final dy = (b.y - a.y).toDouble();
+    final iodPx = math.sqrt(dx * dx + dy * dy);
+    if (iodPx < 1) {
+      _reset();
+      return idle;
+    }
+
+    final midPxX = (a.x + b.x) / 2;
+    final midPxY = (a.y + b.y) / 2;
+
+    final iod = iodPx / boxW; // distanza tra gli occhi / larghezza riquadro
+    final midX = (midPxX - boxLeft) / boxW;
+    final midY = (midPxY - boxTop) / boxH;
+
+    // Inclinazione: angolo della linea degli occhi rispetto all'orizzontale.
+    final roll = (math.atan2(dy, dx) * 180 / math.pi).abs();
+
+    // Rotazione laterale: spostamento del naso lungo la linea degli occhi,
+    // in unità di distanza interoculare. Proiettato sull'asse degli occhi,
+    // quindi non si confonde con l'inclinazione della testa.
+    final noseAlong =
+        ((nose.x - midPxX) * dx + (nose.y - midPxY) * dy) / iodPx;
+    final noseOff = noseAlong.abs() / iodPx;
+
+    final yaw = (face.headEulerAngleY ?? 0).abs();
+    final pitch = (face.headEulerAngleX ?? 0).abs();
+
     final dbg = debugInfo
-        ? ' [r ${ratio.toStringAsFixed(2)}  x ${cx.toStringAsFixed(2)}  y ${cy.toStringAsFixed(2)}]'
+        ? ' [d ${iod.toStringAsFixed(3)}  yaw ${yaw.toStringAsFixed(0)}'
+            '  n ${noseOff.toStringAsFixed(2)}  roll ${roll.toStringAsFixed(0)}'
+            '  x ${midX.toStringAsFixed(2)}  y ${midY.toStringAsFixed(2)}]'
         : '';
 
+    final k = _wasAligned ? _holdFactor : 1.0;
+    final iodTol = _targetIod * _iodTolerance * k;
+
     String? problem;
-    if (ratio < _minFaceRatio) {
+    if (iod < _targetIod - iodTol) {
       problem = 'Avvicinati';
-    } else if (ratio > _maxFaceRatio) {
+    } else if (iod > _targetIod + iodTol) {
       problem = 'Allontanati';
-    } else if ((cx - 0.5).abs() > _maxOffsetX ||
-        (cy - _ovalCenterY).abs() > _maxOffsetY) {
+    } else if ((midX - _targetX).abs() > _maxOffsetX * k ||
+        (midY - _targetY).abs() > _maxOffsetY * k) {
       problem = 'Centra il viso nell’ovale';
-    } else if ((face.headEulerAngleX ?? 0).abs() > _maxAngle ||
-        (face.headEulerAngleY ?? 0).abs() > _maxAngle ||
-        (face.headEulerAngleZ ?? 0).abs() > _maxAngle) {
-      problem = 'Tieni la testa dritta';
+    } else if (yaw > _maxYaw * k || noseOff > _maxNoseOffset * k) {
+      problem = 'Guarda dritto, non ruotare il viso';
+    } else if (roll > _maxRoll * k) {
+      problem = 'Non inclinare la testa di lato';
+    } else if (pitch > _maxPitch * k) {
+      problem = 'Non alzare o abbassare il mento';
     }
 
     if (problem != null) {
-      _okFrames = 0;
+      _reset();
       return (message: '$problem$dbg', aligned: false);
     }
 
@@ -168,6 +261,7 @@ class LiveFaceGuide {
     if (_okFrames < _framesNeeded) {
       return (message: 'Tieni fermo…$dbg', aligned: false);
     }
+    _wasAligned = true;
     return (message: 'Perfetto, scatta ora$dbg', aligned: true);
   }
 

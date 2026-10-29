@@ -15,6 +15,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import 'evaluation_controller.dart';
 import 'live_face_guide.dart';
+import 'eye_detector.dart';
 
 /// Passo 1: scatto della foto del volto con sagoma guida.
 class CameraScreen extends ConsumerStatefulWidget {
@@ -43,7 +44,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   /// true = lo scatto resta bloccato finché il viso non è allineato.
   /// Lascialo false finché non hai tarato la guida sul tuo telefono.
-  static const _requireAlignment = false;
+  static const _requireAlignment = true;
 
   /// La foto scattata con la fotocamera FRONTALE è a specchio (come il selfie)?
   /// Con la posteriore la foto è sempre "vera". Se con la frontale nella
@@ -220,6 +221,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
       ref.read(evaluationDraftProvider.notifier).setPhoto(file.path, boxes);
       await _goToEyes();
+    } on FaceNotFrontalException {
+      if (!mounted) return;
+      setState(() =>
+          _notice = 'Il viso non è frontale. Guarda dritto e riprova.');
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && _notice != null) setState(() => _notice = null);
+      });
+      _startTracking(c);
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Impossibile scattare la foto. Riprova.');

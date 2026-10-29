@@ -14,6 +14,7 @@ import '../evaluation/evaluation_controller.dart';
 import 'patients_controller.dart';
 import 'widgets/eval_card.dart';
 import 'widgets/patient_card.dart';
+import '../../models/evaluation.dart';
 
 class PatientDetailScreen extends ConsumerWidget {
   const PatientDetailScreen({super.key, required this.patientId});
@@ -48,6 +49,48 @@ class PatientDetailScreen extends ConsumerWidget {
     final ctrl = ref.read(patientsProvider.notifier);
     if (context.mounted) context.go(AppRoutes.patients);
     await ctrl.remove(patientId);
+  }
+
+  Future<void> _confirmDeleteEvaluation(
+    BuildContext context,
+    WidgetRef ref,
+    Evaluation e,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Elimina valutazione'),
+        content: Text(
+          'Eliminare la valutazione del ${formatDate(e.date)}? '
+          'L’operazione non si può annullare.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Elimina',
+              style: TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref
+          .read(patientsProvider.notifier)
+          .removeEvaluation(patientId, e.id);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Eliminazione non riuscita. Riprova.')),
+        );
+      }
+    }
   }
 
   // true se si può procedere con una nuova valutazione.
@@ -209,6 +252,7 @@ class PatientDetailScreen extends ConsumerWidget {
                               EvalCard(
                                 evaluation: evals[i],
                                 number: evals.length - i,
+                                onDelete: () => _confirmDeleteEvaluation(context, ref, evals[i]),
                               ),
                           ],
                         ),

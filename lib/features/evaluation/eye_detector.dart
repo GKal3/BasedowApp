@@ -6,6 +6,10 @@ import 'package:image/image.dart' as img;
 
 import '../../models/eye_boxes.dart';
 
+class FaceNotFrontalException implements Exception {
+  const FaceNotFrontalException();
+}
+
 abstract class EyeDetector {
   /// Rileva gli occhi sulla foto scattata. Null se non c'è esattamente un
   /// volto o gli occhi non sono rilevati.
@@ -41,6 +45,14 @@ class MlKitEyeDetector implements EyeDetector {
         await _detector.processImage(InputImage.fromFilePath(photoPath));
     if (faces.length != 1) return null;
     final face = faces.first;
+
+    // Controllo di sicurezza: il viso deve essere frontale anche nella
+    // foto finale (la guida live potrebbe essere stata aggirata o il
+    // paziente essersi mosso un attimo prima dello scatto).
+    if ((face.headEulerAngleY ?? 0).abs() > 10 ||
+        (face.headEulerAngleZ ?? 0).abs() > 10) {
+      throw const FaceNotFrontalException();
+    }
 
     final a = face.contours[FaceContourType.leftEye]?.points;
     final b = face.contours[FaceContourType.rightEye]?.points;
