@@ -86,11 +86,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       if (_cameras.isEmpty) {
         throw CameraException('none', 'Nessuna fotocamera trovata');
       }
-      // Di default la fotocamera frontale (come nel prototipo).
-      final front = _cameras.indexWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
+      // Di default la fotocamera posteriore; la frontale resta disponibile
+      // col pulsante di cambio.
+      final back = _cameras.indexWhere(
+        (c) => c.lensDirection == CameraLensDirection.back,
       );
-      _cameraIndex = front == -1 ? 0 : front;
+      _cameraIndex = back == -1 ? 0 : back;
       await _startCamera();
     } catch (_) {
       if (!mounted) return;
