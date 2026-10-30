@@ -82,7 +82,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   Future<void> _setup() async {
     try {
-      _cameras = await availableCameras();
+      _cameras = _pickCameras(await availableCameras());
       if (_cameras.isEmpty) {
         throw CameraException('none', 'Nessuna fotocamera trovata');
       }
@@ -121,6 +121,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     );
     try {
       await controller.initialize();
+      try {
+        final minZoom = await controller.getMinZoomLevel();
+        final maxZoom = await controller.getMaxZoomLevel();
+        await controller.setZoomLevel(1.0.clamp(minZoom, maxZoom));
+      } catch (e) {
+        // Zoom non supportato: si prosegue col valore predefinito.
+        debugPrint('Zoom 1x non impostato: $e');
+      }
       if (!mounted) {
         await controller.dispose();
         return;
@@ -138,6 +146,26 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         _error = 'Fotocamera non disponibile';
       });
     }
+  }
+
+  /// Tiene al massimo due camere: la frontale e la posteriore PRINCIPALE
+  /// (1x). Grandangolo, tele e macro vengono scartati.
+  List<CameraDescription> _pickCameras(List<CameraDescription> all) {
+    CameraDescription? front;
+    CameraDescription? back;
+    for (final c in all) {
+      if (c.lensDirection == CameraLensDirection.front) {
+        front ??= c;
+      } else if (c.lensDirection == CameraLensDirection.back) {
+        if (back == null) {
+          back = c;
+        } else if (c.lensType == CameraLensType.wide &&
+            back.lensType != CameraLensType.wide) {
+          back = c; // preferisce l'obiettivo principale a quelli secondari
+        }
+      }
+    }
+    return [?back, ?front];
   }
 
   Future<void> _releaseController() async {
