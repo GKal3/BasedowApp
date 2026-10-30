@@ -46,11 +46,23 @@ class MlKitEyeDetector implements EyeDetector {
     if (faces.length != 1) return null;
     final face = faces.first;
 
-    // Controllo di sicurezza: il viso deve essere frontale anche nella
-    // foto finale (la guida live potrebbe essere stata aggirata o il
-    // paziente essersi mosso un attimo prima dello scatto).
-    if ((face.headEulerAngleY ?? 0).abs() > 10 ||
-        (face.headEulerAngleZ ?? 0).abs() > 10) {
+    final lm = face.landmarks;
+    final le = lm[FaceLandmarkType.leftEye]?.position;
+    final re = lm[FaceLandmarkType.rightEye]?.position;
+    final nb = lm[FaceLandmarkType.noseBase]?.position;
+    if (le == null || re == null || nb == null) return null;
+
+    final ex = (re.x - le.x).toDouble();
+    final ey = (re.y - le.y).toDouble();
+    final iod = sqrt(ex * ex + ey * ey);
+    if (iod < 1) return null;
+    final mx = (le.x + re.x) / 2;
+    final my = (le.y + re.y) / 2;
+    final noseOff = (((nb.x - mx) * ex + (nb.y - my) * ey) / iod).abs() / iod;
+
+    if ((face.headEulerAngleY ?? 0).abs() > 6 ||
+        (face.headEulerAngleZ ?? 0).abs() > 10 ||
+        noseOff > 0.08) {
       throw const FaceNotFrontalException();
     }
 

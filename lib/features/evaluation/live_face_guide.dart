@@ -83,12 +83,12 @@ class LiveFaceGuide {
   static const _maxOffsetY = 0.025;
 
   /// Rotazione laterale (yaw), in gradi.
-  static const _maxYaw = 7.0;
+  static const _maxYaw = 4.5;
 
   /// Spostamento del naso rispetto al centro degli occhi, in unità di
   /// distanza interoculare. Con il viso frontale è ≈ 0: controllo
   /// indipendente dall'angolo stimato da ML Kit.
-  static const _maxNoseOffset = 0.07;
+  static const _maxNoseOffset = 0.05;
 
   /// Inclinazione laterale della testa (calcolata dalla linea degli occhi).
   static const _maxRoll = 5.0;
@@ -98,7 +98,7 @@ class LiveFaceGuide {
 
   /// Dopo che il viso è allineato, le tolleranze si allargano di questo
   /// fattore finché non esce davvero (evita lo sfarfallio al limite).
-  static const _holdFactor = 1.3;
+  static const _holdFactor = 1.15;
 
   /// Fotogrammi consecutivi "buoni" prima di segnare il viso come allineato.
   static const _framesNeeded = 5;
@@ -139,9 +139,11 @@ class LiveFaceGuide {
     _busy = true;
     try {
       final rotation = _rotation(camera, orientation);
-      if (rotation == null) return null;
-      final input = _toInputImage(image, rotation);
-      if (input == null) return null;
+      final input = rotation == null ? null : _toInputImage(image, rotation);
+      if (rotation == null || input == null) {
+        _reset();
+        return idle;
+      }
 
       final faces = await _detector.processImage(input);
 
@@ -158,7 +160,8 @@ class LiveFaceGuide {
 
       return _evaluate(faces, upright);
     } catch (_) {
-      return null;
+      _reset();
+      return idle;
     } finally {
       _busy = false;
     }
