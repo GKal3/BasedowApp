@@ -486,24 +486,64 @@ class _FaceMask extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: Align(
-        alignment: const Alignment(0, -0.12),
-        child: FractionallySizedBox(
-          widthFactor: 0.78,
-          child: AspectRatio(
-            aspectRatio: 319 / 384,
-            child: Image.asset(
-              'assets/images/face_guide_mask.png',
-              fit: BoxFit.contain,
-              // Colora la sagoma usando solo la trasparenza dell'immagine.
-              color: aligned ? AppColors.amber : const Color(0xEBFFFFFF),
-              colorBlendMode: BlendMode.srcIn,
-            ),
+      child: SizedBox.expand(
+        child: CustomPaint(
+          painter: _MaskPainter(
+            aligned ? AppColors.amber : const Color(0xEBFFFFFF),
           ),
         ),
       ),
     );
   }
+}
+
+class _MaskPainter extends CustomPainter {
+  const _MaskPainter(this.color);
+
+  final Color color;
+
+  /// Ingrandimento dell'ovale rispetto alla sagoma originale.
+  /// I rettangoli degli occhi non cambiano. Valori sensati: 1.10 - 1.25.
+  static const ovalScale = 1.15;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    // Tutto in multipli della distanza tra gli occhi (iod).
+    final iod = LiveFaceGuide.eyeIod * s.width;
+    final cx = LiveFaceGuide.eyeMidX * s.width;
+    final cy = LiveFaceGuide.eyeMidY * s.height;
+
+    // Rettangoli degli occhi (come nel PNG originale).
+    for (final dx in [-iod / 2, iod / 2]) {
+      canvas.drawRect(
+        Rect.fromCenter(
+          center: Offset(cx + dx, cy),
+          width: iod * 0.571,
+          height: iod * 0.348,
+        ),
+        paint,
+      );
+    }
+
+    // Ovale: stesse proporzioni dell'originale, ingrandito attorno al
+    // proprio centro (che sta un po' sotto la linea degli occhi).
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx, cy + iod * 0.166),
+        width: iod * 2.222 * ovalScale,
+        height: iod * 2.675 * ovalScale,
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MaskPainter old) => old.color != color;
 }
 
 class _StatusPill extends StatelessWidget {

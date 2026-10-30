@@ -67,6 +67,11 @@ class LiveFaceGuide {
       0.5 + ((_maskEyeLeftX + _maskEyeRightX) / 2 - 0.5) * maskWidthFactor;
   static const _targetY = _maskTop + _maskEyeY * _maskH;
 
+  /// Per il disegno della sagoma in camera_screen.dart.
+  static const eyeIod = _targetIod;
+  static const eyeMidX = _targetX;
+  static const eyeMidY = _targetY;
+
   // ---- Tolleranze (da tarare con debugInfo = true) ----
 
   /// Scarto ammesso sulla distanza, relativo al valore target (±5%).
