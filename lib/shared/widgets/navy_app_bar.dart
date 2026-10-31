@@ -36,38 +36,50 @@ class NavyAppBar extends StatelessWidget implements PreferredSizeWidget {
             height: _height,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Row(
-                children: [
-                  if (onBack != null) ...[
-                    _RoundIconButton(
-                      icon: Icons.chevron_left,
-                      onTap: onBack!,
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.t(16, w: FontWeight.w800, c: AppColors.white),
-                        ),
-                        if (subtitle != null && subtitle!.isNotEmpty)
-                          Text(
-                            subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.t(11, c: AppColors.sky300),
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler:
+                      MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3),
+                ),
+                child: Row(
+                  children: [
+                    if (onBack != null) ...[
+                      _RoundIconButton(
+                        icon: Icons.chevron_left,
+                        onTap: onBack!,
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              style: AppText.t(16, w: FontWeight.w800, c: AppColors.white),
+                            ),
                           ),
-                      ],
+                          if (subtitle != null && subtitle!.isNotEmpty)
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                subtitle!,
+                                maxLines: 1,
+                                style: AppText.t(11, c: AppColors.sky300),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  ?trailing,
-                ],
+                    ?trailing,
+                  ],
+                ),
               ),
             ),
           ),

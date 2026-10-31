@@ -104,15 +104,13 @@ class EvalCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _EyeBlock(label: 'OD', eye: e.od)),
-                const SizedBox(width: 10),
-                Expanded(child: _EyeBlock(label: 'OS', eye: e.os)),
-              ],
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _EyeBlock(label: 'OD', eye: e.od)),
+              const SizedBox(width: 10),
+              Expanded(child: _EyeBlock(label: 'OS', eye: e.os)),
+            ],
           ),
           if (hasSymptoms) ...[
             const SizedBox(height: 10),
@@ -174,6 +172,7 @@ class _InfoBox extends StatelessWidget {
         border: Border.all(color: const Color(0x14023047), width: 1.5),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(

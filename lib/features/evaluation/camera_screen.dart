@@ -278,105 +278,159 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   @override
   Widget build(BuildContext context) {
     final ready = _controller?.value.isInitialized ?? false;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+
+    // Spazio minimo che la barra in basso deve sempre avere:
+    // distanza dall'alto + pulsante + un po' d'aria + area di sicurezza.
+    const buttonTop = 20.0;
+    const shutterSize = 74.0;
+    final minBottom = buttonTop + shutterSize + 16 + safeBottom;
 
     return WizardScaffold(
       title: 'Scatta la foto',
       step: 1,
       showNext: false,
       onBack: () => context.pop(),
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            const _InstructionBanner(),
-            AspectRatio(
-              aspectRatio: 3 / 4,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _Preview(controller: _controller, starting: _starting),
-                  const _GuideShade(),
-                  const _ThirdsGrid(),
-                  // Sagoma ovale: diventa gialla quando il viso è allineato.
-                  ValueListenableBuilder<GuideResult>(
-                    valueListenable: _guide,
-                    builder: (_, g, _) => _FaceMask(aligned: g.aligned),
-                  ),
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    right: 16,
-                    child: Center(
-                      child: ValueListenableBuilder<GuideResult>(
-                        valueListenable: _guide,
-                        builder: (_, g, _) => _StatusPill(
-                          text: _error ??
-                              _notice ??
-                              (ready ? g.message : 'Avvio fotocamera…'),
-                          ok: _error == null && _notice == null && g.aligned,
+      child: Column(
+        children: [
+          const _InstructionBanner(),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                // Anteprima 3:4 a larghezza piena. Solo se lo schermo è
+                // troppo basso si restringe (con bande scure ai lati),
+                // così la barra in basso non esce mai dallo schermo.
+                final previewH = (c.maxWidth * 4 / 3)
+                    .clamp(0.0, c.maxHeight - minBottom)
+                    .toDouble();
+
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: previewH,
+                      width: double.infinity,
+                      child: ColoredBox(
+                        color: AppColors.cameraBg,
+                        child: Center(
+                          // 3:4 fisso: la guida in tempo reale è calcolata
+                          // su queste proporzioni.
+                          child: AspectRatio(
+                            aspectRatio: 3 / 4,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                _Preview(
+                                  controller: _controller,
+                                  starting: _starting,
+                                ),
+                                const _GuideShade(),
+                                const _ThirdsGrid(),
+                                // Sagoma: gialla quando il viso è allineato.
+                                ValueListenableBuilder<GuideResult>(
+                                  valueListenable: _guide,
+                                  builder: (_, g, _) =>
+                                      _FaceMask(aligned: g.aligned),
+                                ),
+                                Positioned(
+                                  top: 16,
+                                  left: 16,
+                                  right: 16,
+                                  child: Center(
+                                    child: ValueListenableBuilder<GuideResult>(
+                                      valueListenable: _guide,
+                                      builder: (_, g, _) => _StatusPill(
+                                        text: _error ??
+                                            _notice ??
+                                            (ready
+                                                ? g.message
+                                                : 'Avvio fotocamera…'),
+                                        ok: _error == null &&
+                                            _notice == null &&
+                                            g.aligned,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: double.infinity,
-              color: AppColors.sky50,
-              padding: EdgeInsets.fromLTRB(
-                20,
-                20,
-                20,
-                20 + MediaQuery.of(context).padding.bottom,
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    _error == null
-                        ? "Allinea il viso all'interno dell'ovale, a distanza costante"
-                        : "Consenti l'accesso alla fotocamera dalle impostazioni per continuare.",
-                    textAlign: TextAlign.center,
-                    style: AppText.t(13, c: AppColors.muted),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(width: 46),
-                      const SizedBox(width: 28),
-                      ValueListenableBuilder<GuideResult>(
-                        valueListenable: _guide,
-                        builder: (_, g, _) => _ShutterButton(
-                          enabled: ready &&
-                              !_capturing &&
-                              (!_requireAlignment ||
-                                  g.aligned ||
-                                  _tracker == null),
-                          onTap: _capture,
+                    // Rettangolo che occupa tutto lo spazio sotto l'anteprima.
+                    // Il pulsante sta sempre a 20 px dal suo bordo superiore.
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        color: AppColors.sky50,
+                        padding: const EdgeInsets.only(top: buttonTop),
+                        alignment: Alignment.topCenter,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(width: 46),
+                                const SizedBox(width: 28),
+                                ValueListenableBuilder<GuideResult>(
+                                  valueListenable: _guide,
+                                  builder: (_, g, _) => _ShutterButton(
+                                    enabled: ready &&
+                                        !_capturing &&
+                                        (!_requireAlignment ||
+                                            g.aligned ||
+                                            _tracker == null),
+                                    onTap: _capture,
+                                  ),
+                                ),
+                                const SizedBox(width: 28),
+                                _SwitchCameraButton(onTap: _switchCamera),
+                              ],
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 10),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
+                                child: Text(
+                                  "Consenti l'accesso alla fotocamera dalle impostazioni per continuare.",
+                                  textAlign: TextAlign.center,
+                                  style: AppText.t(13, c: AppColors.muted),
+                                ),
+                              ),
+                            ],
+                            // Solo in debug: permette di provare il resto
+                            // del flusso su simulatori senza fotocamera.
+                            if (kDebugMode && _error != null)
+                              TextButton(
+                                onPressed: () {
+                                  ref
+                                      .read(evaluationDraftProvider.notifier)
+                                      .setPhoto('');
+                                  context.push(
+                                    AppRoutes.eye(widget.patientId, Eye.od),
+                                  );
+                                },
+                                child: Text(
+                                  'Continua senza foto (solo test)',
+                                  style: AppText.t(
+                                    13,
+                                    w: FontWeight.w800,
+                                    c: AppColors.orange,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 28),
-                      _SwitchCameraButton(onTap: _switchCamera),
-                    ],
-                  ),
-                  // Solo in debug: permette di provare il resto del flusso
-                  // su simulatori senza fotocamera.
-                  if (kDebugMode && _error != null)
-                    TextButton(
-                      onPressed: () {
-                        ref.read(evaluationDraftProvider.notifier).setPhoto('');
-                        context.push(AppRoutes.eye(widget.patientId, Eye.od));
-                      },
-                      child: Text(
-                        'Continua senza foto (solo test)',
-                        style: AppText.t(13, w: FontWeight.w800, c: AppColors.orange),
-                      ),
                     ),
-                ],
-              ),
+                  ],
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

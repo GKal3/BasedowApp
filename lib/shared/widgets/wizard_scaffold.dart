@@ -58,12 +58,14 @@ class WizardScaffold extends StatelessWidget {
                           tooltip: 'Indietro',
                         ),
                         Expanded(
-                          child: Text(
-                            title,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.t(16, w: FontWeight.w800),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              title,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              style: AppText.t(16, w: FontWeight.w800),
+                            ),
                           ),
                         ),
                         Visibility(
