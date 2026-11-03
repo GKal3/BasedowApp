@@ -142,6 +142,7 @@ class PatientDetailScreen extends ConsumerWidget {
     final evals = [...patient.evaluations]
       ..sort((a, b) => b.date.compareTo(a.date));
     final age = patient.age;
+    final notes = patient.note.trim();
 
     return Scaffold(
       appBar: NavyAppBar(
@@ -208,6 +209,34 @@ class PatientDetailScreen extends ConsumerWidget {
                                 '${age != null ? ' · $age anni' : ''}',
                         style: AppText.t(13, c: AppColors.muted),
                       ),
+                      if (notes.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        const Divider(
+                          height: 1,
+                          thickness: 1.5,
+                          color: AppColors.cardBorder,
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'NOTE CLINICHE',
+                                style: AppText.t(
+                                  11.5,
+                                  w: FontWeight.w800,
+                                  c: AppColors.muted,
+                                  ls: 0.6,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(notes, style: AppText.t(14, h: 1.45)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
