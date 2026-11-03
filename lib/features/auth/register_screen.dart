@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../theme/app_colors.dart';
 import '../../router/app_routes.dart';
+import '../../shared/password_rules.dart';
 import '../../shared/widgets/app_buttons.dart';
 import '../../shared/widgets/app_text_field.dart';
 import '../../shared/widgets/form_error_box.dart';
+import '../../shared/widgets/password_checklist.dart';
 import 'auth_controller.dart';
 import 'auth_scaffold.dart';
 
@@ -23,6 +26,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _password = TextEditingController();
   String? _error;
   bool _loading = false;
+  bool _showPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Aggiorna la checklist a ogni carattere digitato.
+    _password.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -38,8 +49,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final cognome = _cognome.text.trim();
     final email = _email.text.trim();
     final pwd = _password.text;
-    if (nome.isEmpty || cognome.isEmpty || email.isEmpty || pwd.length < 6) {
+    if (nome.isEmpty || cognome.isEmpty || email.isEmpty) {
       setState(() => _error = 'Compila tutti i campi correttamente.');
+      return;
+    }
+    if (!isPasswordValid(pwd)) {
+      setState(() => _error = 'La password non rispetta tutti i requisiti.');
       return;
     }
     setState(() {
@@ -99,10 +114,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         AppTextField(
           label: 'Password',
           controller: _password,
-          hint: 'Almeno 6 caratteri',
-          obscureText: true,
+          hint: 'Almeno 8 caratteri',
+          obscureText: !_showPassword,
           textInputAction: TextInputAction.done,
+          suffixIcon: IconButton(
+            tooltip: _showPassword ? 'Nascondi password' : 'Mostra password',
+            icon: Icon(
+              _showPassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: AppColors.muted,
+            ),
+            onPressed: () => setState(() => _showPassword = !_showPassword),
+          ),
         ),
+        PasswordChecklist(password: _password.text),
         const SizedBox(height: 6),
         PrimaryButton(label: 'Registrati', onPressed: _submit, loading: _loading),
         const SizedBox(height: 14),

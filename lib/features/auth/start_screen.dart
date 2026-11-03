@@ -21,7 +21,7 @@ class StartScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset('assets/images/eye_mark.png', width: 190),
+                  Image.asset('assets/images/eye_mark.png', width: 170),
                   const SizedBox(height: 28),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 300),

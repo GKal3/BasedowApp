@@ -107,7 +107,7 @@ class LiveFaceGuide {
   /// d = distanza tra gli occhi (target ≈ 0.35), yaw, n = offset del naso,
   /// roll, x e y = punto medio degli occhi (target ≈ 0.50 e 0.44).
   /// Mettilo a false quando hai finito di tarare.
-  static const debugInfo = true;
+  static const debugInfo = false;
 
   /// Analizzo al massimo un fotogramma ogni tanto: basta e risparmia batteria.
   static const _minInterval = Duration(milliseconds: 120);

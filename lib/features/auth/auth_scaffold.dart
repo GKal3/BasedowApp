@@ -74,7 +74,7 @@ class AuthScaffold extends StatelessWidget {
                 right: 18,
                 child: Opacity(
                   opacity: 0.45,
-                  child: Image.asset('assets/images/eye_mark.png', width: 56),
+                  child: Image.asset('assets/images/eye_mark.png', width: 43),
                 ),
               ),
             ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../theme/app_colors.dart';
 import '../../router/app_routes.dart';
 import '../../shared/widgets/app_buttons.dart';
 import '../../shared/widgets/app_text_field.dart';
@@ -21,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _password = TextEditingController();
   String? _error;
   bool _loading = false;
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -64,8 +66,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           label: 'Password',
           controller: _password,
           hint: '••••••••',
-          obscureText: true,
+          obscureText: !_showPassword,
           textInputAction: TextInputAction.done,
+          suffixIcon: IconButton(
+            tooltip: _showPassword ? 'Nascondi password' : 'Mostra password',
+            icon: Icon(
+              _showPassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: AppColors.muted,
+            ),
+            onPressed: () => setState(() => _showPassword = !_showPassword),
+          ),
         ),
         const SizedBox(height: 6),
         PrimaryButton(label: 'Accedi', onPressed: _submit, loading: _loading),
