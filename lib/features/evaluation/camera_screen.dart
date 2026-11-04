@@ -499,18 +499,42 @@ class _Preview extends StatelessWidget {
             : null,
       );
     }
-    // previewSize è in orizzontale: scambio larghezza/altezza per il ritratto
-    // e riempio il riquadro 3:4 ritagliando (come object-fit: cover).
-    final size = c.value.previewSize!;
-    return ClipRect(
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          width: size.height,
-          height: size.width,
-          child: CameraPreview(c),
-        ),
-      ),
+    return ValueListenableBuilder<CameraValue>(
+      valueListenable: c,
+      builder: (context, value, _) {
+        final orientation =
+            value.lockedCaptureOrientation ?? value.deviceOrientation;
+        final isLandscape =
+            orientation == DeviceOrientation.landscapeLeft ||
+            orientation == DeviceOrientation.landscapeRight;
+        final previewAspectRatio = isLandscape
+            ? value.aspectRatio
+            : 1 / value.aspectRatio;
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final viewportAspectRatio =
+                constraints.maxWidth / constraints.maxHeight;
+            final previewWidth = previewAspectRatio > viewportAspectRatio
+                ? constraints.maxHeight * previewAspectRatio
+                : constraints.maxWidth;
+            final previewHeight = previewAspectRatio > viewportAspectRatio
+                ? constraints.maxHeight
+                : constraints.maxWidth / previewAspectRatio;
+
+            return ClipRect(
+              child: OverflowBox(
+                alignment: Alignment.center,
+                minWidth: previewWidth,
+                maxWidth: previewWidth,
+                minHeight: previewHeight,
+                maxHeight: previewHeight,
+                child: CameraPreview(c),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
