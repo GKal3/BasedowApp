@@ -103,3 +103,6 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/app_icon.png"
   remove_alpha_ios: true
+
+dependency_overrides:
+  camera_avfoundation: 0.10.3+1
