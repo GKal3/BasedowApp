@@ -124,6 +124,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     );
     try {
       await controller.initialize();
+      await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
       try {
         final minZoom = await controller.getMinZoomLevel();
         final maxZoom = await controller.getMaxZoomLevel();
