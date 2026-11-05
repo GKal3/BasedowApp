@@ -55,6 +55,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   @override
   void initState() {
     super.initState();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addObserver(this);
     if (!kIsWeb) _tracker = LiveFaceGuide();
     _setup();
@@ -123,7 +124,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     );
     try {
       await controller.initialize();
-      await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
       try {
         final minZoom = await controller.getMinZoomLevel();
         final maxZoom = await controller.getMaxZoomLevel();
@@ -502,14 +502,7 @@ class _Preview extends StatelessWidget {
     return ValueListenableBuilder<CameraValue>(
       valueListenable: c,
       builder: (context, value, _) {
-        final orientation =
-            value.lockedCaptureOrientation ?? value.deviceOrientation;
-        final isLandscape =
-            orientation == DeviceOrientation.landscapeLeft ||
-            orientation == DeviceOrientation.landscapeRight;
-        final previewAspectRatio = isLandscape
-            ? value.aspectRatio
-            : 1 / value.aspectRatio;
+        final previewAspectRatio = 1 / value.aspectRatio;
 
         return LayoutBuilder(
           builder: (context, constraints) {
